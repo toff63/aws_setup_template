@@ -1,0 +1,53 @@
+{
+  "description": "Build from an OS image.",
+  "variables": {
+    "build_instance_type": "t2.small",
+    "environment": "{{env `ENVIRONMENT`}}"
+  },
+  "builders": [
+    {
+      "name": "elixir",
+      "type": "amazon-ebs",
+      "profile": "aws_template",
+      "subnet_filter": {
+        "filters": {
+          "tag:Class": "build"
+        },
+        "most_free": true,
+        "random": false
+                    
+      },
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "name": "common*",
+          "tag:environment": "{{ user `environment`}}",
+          "root-device-type": "ebs"
+        },
+        "most_recent": true,
+        "owners": ["844334296640"]
+        
+      },
+      "instance_type": "{{user `build_instance_type`}}",
+      "ssh_username": "ubuntu",
+      "ami_name": "elixir_{{isotime | clean_ami_name}}",
+      "iam_instance_profile": "packer_profile",
+      "tags": {
+        "component": "elixir",
+        "build_date": "{{isotime}}",
+        "environment": "{{user `environment`}}"
+      }
+    }],
+    "provisioners": [
+      {
+        "type": "shell",
+        "script": "remove-apt-lock.sh"
+      },
+      {
+        "type": "ansible-local",
+        "playbook_file": "../ansible/elixir.yml",
+        "role_paths": ["../ansible/roles/elixir"],
+        "extra_arguments": ["-vvv","-e","packer=yes"]
+      }
+    ]
+}

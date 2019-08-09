@@ -1,0 +1,15 @@
+---
+# List from https://github.com/OnceApp/once-configuration/blob/master/apt-packages
+common_packages:
+  - aptitude # Needed for upgrade support in Ansible apt module
+  - acl # To make `Becoming an Unprivileged User` works. cf. https://docs.ansible.com/ansible/become.html#becoming-an-unprivileged-user
+  - htop
+  - dstat
+  - vim
+  - curl
+  - unzip
+  - git
+  - openssl
+
+authorized_keys:
+  - mygithubuser

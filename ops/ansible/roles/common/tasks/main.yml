@@ -1,0 +1,71 @@
+---
+
+# Ensure fast Aurora failover by increasing tcp keepalive frequency
+- name: time, in seconds, after which a keepalive packet is sent when no data has been sent by the socket (ACKs are not considered data)
+  sysctl:
+    name: net.ipv4.tcp_keepalive_time 
+    value: 1
+    state: present
+
+- name: time, in seconds, between sending subsequent keepalive packets after the initial packet is sent
+  sysctl:
+    name: net.ipv4.tcp_keepalive_intvl
+    value: 1
+    state: present
+
+- name: the number of unacknowledged keepalive probes that occur before the application is notified
+  sysctl:
+    name: net.ipv4.tcp_keepalive_probes
+    value: 5
+    state: present
+
+# File descriptor limit
+- name: Increase the max number of open file at system level
+  sysctl:
+    name: fs.file-max
+    value: 1048576
+    state: present
+
+- name: Set Shell File Limits
+  copy:
+    src: 91-nofiles.conf
+    dest: /etc/security/limits.d
+
+- name: Install system packages.
+  apt: pkg={{ item }} state=installed update_cache=yes cache_valid_time=86400
+  with_items: "{{ common_packages }}"
+
+- name: install python pip
+  apt: "pkg=python-pip state=present"
+
+- name: install JQ 
+  apt: "pkg=jq state=present"
+
+- name: Install AWS cli
+  pip:
+    name: awscli
+    
+- name: Upgrade apt packages
+  apt: upgrade=yes update_cache=yes cache_valid_time=86400
+
+- name: Install NTP
+  apt: pkg=ntp state=installed
+
+- name: Make sure ntpd is running and enabled
+  service: name=ntp state=started enabled=yes
+
+- name: Create user
+  user: name=my_product comment="my_product user" shell="/bin/bash"
+
+- name: Set up authorized_keys
+  authorized_key: user=my_product key="https://github.com/{{ item }}.keys"
+  with_items: "{{ authorized_keys }}"
+  tags:
+    - keys
+
+- name: Install sudoers config
+  copy: src=sudoers
+        dest=/etc/sudoers.d/once
+        owner=root group=root mode=0440
+        validate='visudo -cf %s'
+

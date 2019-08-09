@@ -1,0 +1,58 @@
+---
+
+- name: Create /var/lib/my_product
+  file: path=/var/lib/my_product/ state=directory owner=my_product group=my_product mode=0750
+
+- name: Create /etc/my_product
+  file: path=/etc/my_product/ state=directory owner=my_product group=my_product mode=0750
+
+- name: Inet erlang config
+  copy: src=etc/my_product/erl_inetrc dest=/etc/my_product/erl_inetrc  owner=my_product group=my_product
+
+- name: Install boto (needed for s3 module)
+  apt: pkg=python-boto state=present update_cache=yes cache_valid_time=86400
+
+- name: Install boto3 needed for aws_s3 module
+  pip:
+    name: boto3
+
+- name: Install release from s3 bucket
+  aws_s3:
+    bucket: "myproduct-release"
+    object: "/api/{{ api_version }}.zip"
+    dest: "/tmp/api.zip"
+    mode: get
+    region: "eu-west-1"
+
+- name: Unzip the code
+  unarchive:
+    src: "/tmp/api.zip"
+    dest: "/home/my_product/"
+    remote_src: yes
+    owner: my_product
+    group: ubuntu
+
+- name: Build release
+  shell: "MIX_ENV={{ mix_env }} ./release.sh {{ mix_app_name }}"
+  args:
+    chdir: /home/my_product/hello_world
+
+- name: Deploy release directory to /var/lib/my_product
+  command: cp -r /home/my_product/hello_world/_build /var/lib/my_product/
+
+- name: Ensure my_product has access to _build files
+  command: chown -R my_product:my_product /var/lib/my_product/
+
+- name: Ensure my_product has access to deps
+  command: chown -R my_product /home/my_product/hello_world/deps/
+
+- name: Deploy systemd config from S3
+  aws_s3:
+    bucket: "myproduct-configuration"
+    object: "/api/my_product-{{ env }}.service"
+    dest: "/etc/systemd/system/my_product.service"
+    mode: get
+    region: "eu-west-1"
+
+- name: enable service
+  command: systemctl enable my_product.service

@@ -1,0 +1,57 @@
+{
+  "description": "Build from an OS image.",
+  "variables": {
+    "build_instance_type": "m5d.large",
+    "environment": "{{env `ENVIRONMENT`}}",
+    "mix_env": "{{env `MIX_ENV`}}",
+    "version": "{{env `VERSION`}}",
+    "mix_app_name": "myproduct"
+  },
+  "builders": [
+    {
+      "name": "api",
+      "type": "amazon-ebs",
+      "region": "eu-west-1",
+      "profile": "aws_template",
+      "subnet_filter": {
+        "filters": {
+          "tag:Class": "build"
+        },
+        "most_free": true,
+        "random": false
+                    
+      },
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "name": "elixir*",
+          "tag:environment": "{{ user `environment`}}",
+          "root-device-type": "ebs"
+        },
+        "most_recent": true,
+        "owners": ["844334296640"]
+      },
+      "instance_type": "{{user `build_instance_type`}}",
+      "ssh_username": "ubuntu",
+      "ami_name": "api {{isotime | clean_ami_name}}",
+      "iam_instance_profile": "packer_profile",
+      "tags": {
+        "component": "api",
+        "build_date": "{{isotime}}",
+        "environment": "{{user `environment`}}",
+        "version": "{{ user `version` }}"
+      }
+    }],
+    "provisioners": [
+      {
+        "type": "shell",
+        "script": "remove-apt-lock.sh"
+      },
+      {
+        "type": "ansible-local",
+        "playbook_file": "../ansible/api.yml",
+        "role_paths": ["../ansible/roles/api"],
+        "extra_arguments": ["-vvv","-e","packer=yes", "-e", "api_version={{user `version`}}","-e", "env={{user `environment`}}","-e", "mix_env={{user `mix_env`}}","-e", "mix_app_name={{user `mix_app_name`}}"]
+      }
+    ]
+}

@@ -1,0 +1,58 @@
+{
+  "description": "Build from an OS image.",
+  "variables": {
+    "latest_ubuntu_18": "ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*",
+    "build_instance_type": "m5.large",
+    "environment": "{{env `ENVIRONMENT`}}"
+  },
+  "builders": [
+    {
+      "name": "common",
+      "type": "amazon-ebs",
+      "profile": "aws_template",
+      "region": "eu-west-1",
+      "instance_type": "{{user `build_instance_type`}}",
+      "ssh_username": "ubuntu",
+      "ena_support": true,
+      "subnet_filter": {
+        "filters": {
+          "tag:Class": "build"
+        },
+        "most_free": true,
+        "random": false
+                    
+      },
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "name": "{{user `latest_ubuntu_18`}}",
+          "root-device-type": "ebs"
+        },
+        "most_recent": true,
+        "owners": ["099720109477"]
+      },
+      "ami_name": "common {{isotime | clean_ami_name}}",
+      "iam_instance_profile": "packer_profile",
+      "tags": {
+        "component": "common",
+        "build_date": "{{isotime}}",
+        "environment": "{{user `environment`}}"
+      }
+    }],
+    "provisioners": [
+      {
+        "type": "shell",
+        "script": "install-ansible.sh"
+      },
+      {
+        "type": "shell",
+        "script": "remove-apt-lock.sh"
+      },
+      {
+        "type": "ansible-local",
+        "playbook_file": "../ansible/common.yml",
+        "role_paths": ["../ansible/roles/common"],
+        "extra_arguments": ["-vvv","-e","packer=yes"]
+      }
+    ]
+}
